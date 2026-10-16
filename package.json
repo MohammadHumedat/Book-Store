@@ -1,0 +1,21 @@
+{
+  "name": "book-store",
+  "version": "1.0.0",
+  "description": "book store learning course",
+  "license": "ISC",
+  "author": "mohammad",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "joi": "^18.2.9"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "nodemon": "^3.1.14"
+  }
+}
