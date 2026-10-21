@@ -1,24 +1,54 @@
-import express from "express";
+import express, { type ErrorRequestHandler } from "express";
+import mongoose from "mongoose";
+
 import bookPath from "./routes/books.ts";
 import authorsRouter from "./routes/authors.ts";
-import mongoose, { connect } from "mongoose";
-// start point
+
+// Start point
 const app = express();
 
-//Middelware
+// Middleware
 app.use(express.json());
 
-// Connection to Database
-mongoose
-  .connect("mongodb://localhost/bookStoreDB")
-  .then(() => console.log("Connected to DB ..."))
-  .catch((error) => console.log(`error connecting to DB ${error}`));
-// books endpoints
+// Books endpoints
 app.use("/api/books", bookPath);
 
-// authors endpoints
+// Authors endpoints
 app.use("/api/auth", authorsRouter);
 
-const port = 8080;
+// Centralized Error-Handling Middleware
+const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+  console.error(err);
 
-app.listen(port, () => console.log(`the server running on port ${port}`));
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(500).json({
+    message: "Internal server error",
+  });
+};
+
+// Must be registered after all routes
+app.use(errorHandler);
+
+// Server configuration
+const PORT = 8080;
+
+// Connect to the database, then start the server
+const startServer = async () => {
+  try {
+    await mongoose.connect("mongodb://localhost/bookStoreDB");
+
+    console.log("Connected to DB ...");
+
+    app.listen(PORT, () => {
+      console.log(`The server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Error connecting to DB:", error);
+    process.exit(1);
+  }
+};
+
+void startServer();

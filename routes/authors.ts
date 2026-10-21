@@ -2,7 +2,7 @@ import express from "express";
 import { validateUser, validateUpdateUser } from "../models/Author.ts";
 import mongoose from "mongoose";
 import Author from "../models/Author.ts";
-
+import expressAsyncHandler from "express-async-handler";
 const router = express.Router();
 
 /**
@@ -11,17 +11,15 @@ const router = express.Router();
  * @method  GET
  * @access  Public
  */
-router.get("/", async (_req, res) => {
-  try {
+router.get(
+  "/",
+  expressAsyncHandler(async (_req, res) => {
     const authors = await Author.find()
       .sort({ firstName: 1 })
       .select("firstName lastName");
     res.status(200).json(authors);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+  }),
+);
 
 /**
  * @desc    Get a specific author by ID
@@ -29,8 +27,9 @@ router.get("/", async (_req, res) => {
  * @method  GET
  * @access  Public
  */
-router.get("/:id", async (req, res) => {
-  try {
+router.get(
+  "/:id",
+  expressAsyncHandler(async (req, res) => {
     if (!mongoose.isObjectIdOrHexString(req.params.id)) {
       return res.status(400).json({ message: "Invalid author ID" });
     }
@@ -44,11 +43,8 @@ router.get("/:id", async (req, res) => {
       message: "Author found",
       user: author,
     });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+  }),
+);
 
 /**
  * @desc    Create an author
@@ -56,8 +52,9 @@ router.get("/:id", async (req, res) => {
  * @method  POST
  * @access  Public
  */
-router.post("/", async (req, res) => {
-  try {
+router.post(
+  "/",
+  expressAsyncHandler(async (req, res) => {
     const { error, value } = validateUser(req.body);
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
@@ -68,11 +65,8 @@ router.post("/", async (req, res) => {
       firstName: author.firstName,
       lastName: author.lastName,
     });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+  }),
+);
 
 /**
  * @desc    Update an author
@@ -80,8 +74,9 @@ router.post("/", async (req, res) => {
  * @method  PUT
  * @access  Public
  */
-router.put("/:id", async (req, res) => {
-  try {
+router.put(
+  "/:id",
+  expressAsyncHandler(async (req, res) => {
     const { error, value } = validateUpdateUser(req.body);
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
@@ -104,11 +99,8 @@ router.put("/:id", async (req, res) => {
       message: "Author has been updated successfully",
       user: author,
     });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+  }),
+);
 
 /**
  * @desc    Delete an author
@@ -116,8 +108,9 @@ router.put("/:id", async (req, res) => {
  * @method  DELETE
  * @access  Public
  */
-router.delete("/:id", async (req, res) => {
-  try {
+router.delete(
+  "/:id",
+  expressAsyncHandler(async (req, res) => {
     if (!mongoose.isObjectIdOrHexString(req.params.id)) {
       return res.status(400).json({ message: "Invalid author ID" });
     }
@@ -128,10 +121,7 @@ router.delete("/:id", async (req, res) => {
     }
 
     res.status(200).json({ message: "Author has been deleted successfully" });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+  }),
+);
 
 export default router;
