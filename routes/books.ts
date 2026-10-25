@@ -1,31 +1,12 @@
 import express from "express";
-import Joi from "joi";
+import mongoose from "mongoose";
+import expressAsyncHandler from "express-async-handler";
+
+import Book, { validateObject, validateUpObject } from "../models/Book.ts";
+
+import Author from "../models/Author.ts";
 
 const router = express.Router();
-
-interface Book {
-  id: number;
-  title: string;
-  description: string;
-}
-
-const books: Book[] = [
-  {
-    id: 1,
-    title: "Designing Data-Intensive Applications",
-    description: "Designing Data-Intensive Applications",
-  },
-  {
-    id: 2,
-    title: "Samerlive Book",
-    description: "Designing Data-Intensive Applications",
-  },
-  {
-    id: 3,
-    title: "Wisam Book",
-    description: "Designing Data-Intensive Applications",
-  },
-];
 
 /**
  * @desc    Get all books
@@ -33,9 +14,16 @@ const books: Book[] = [
  * @method  GET
  * @access  Public
  */
-router.get("/", (req, res) => {
-  res.send(books);
-});
+router.get(
+  "/",
+  expressAsyncHandler(async (_req, res) => {
+    const books = await Book.find()
+      .populate("author", "firstName lastName")
+      .sort({ title: 1 });
+
+    res.status(200).json(books);
+  }),
+);
 
 /**
  * @desc    Get a specific book by ID
@@ -43,14 +31,30 @@ router.get("/", (req, res) => {
  * @method  GET
  * @access  Public
  */
-router.get("/:id", (req, res) => {
-  const book = books.find((b) => b.id === parseInt(req.params.id));
-  if (book) {
-    res.status(200).json(book);
-  } else {
-    res.status(404).json({ message: "book doesnt exist" });
-  }
-});
+router.get(
+  "/:id",
+  expressAsyncHandler(async (req, res) => {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+      res.status(400).json({ message: "Invalid book ID" });
+      return;
+    }
+
+    const book = await Book.findById(req.params.id).populate(
+      "author",
+      "firstName lastName",
+    );
+
+    if (!book) {
+      res.status(404).json({ message: "Book not found" });
+      return;
+    }
+
+    res.status(200).json({
+      message: "Book found",
+      book,
+    });
+  }),
+);
 
 /**
  * @desc    Create a new book
@@ -58,95 +62,125 @@ router.get("/:id", (req, res) => {
  * @method  POST
  * @access  Public
  */
-router.post("/", (req, res) => {
-  const { error } = validateObject(req.body);
+router.post(
+  "/",
+  expressAsyncHandler(async (req, res) => {
+    const { error, value } = validateObject(req.body);
 
-  if (error) {
-    return res.status(400).json({ message: error.details[0].message });
-  }
+    if (error) {
+      res.status(400).json({
+        message: error.details[0].message,
+      });
+      return;
+    }
 
-  const newbook: Book = {
-    id: books.length + 1,
-    title: req.body.title,
-    description: req.body.description,
-  };
+    const authorExists = await Author.exists({
+      _id: value.author,
+    });
 
-  books.push(newbook);
-  res.status(201).json(newbook);
-});
+    if (!authorExists) {
+      res.status(404).json({
+        message: "Author not found",
+      });
+      return;
+    }
+
+    const book = await Book.create(value);
+
+    await book.populate("author", "firstName lastName");
+
+    res.status(201).json(book);
+  }),
+);
 
 /**
  * @desc    Update a book
  * @route   /api/books/:id
- * @method  Put
+ * @method  PUT
  * @access  Public
  */
+router.put(
+  "/:id",
+  expressAsyncHandler(async (req, res) => {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+      res.status(400).json({ message: "Invalid book ID" });
+      return;
+    }
 
-router.put("/:id", (req, res) => {
-  const { error } = validateUpObject(req.body);
-  if (error) {
-    return res.status(400).json({ message: error.details[0].message });
-  }
+    const { error, value } = validateUpObject(req.body);
 
-  const book = books.find((b) => b.id === parseInt(req.params.id));
+    if (error) {
+      res.status(400).json({
+        message: error.details[0].message,
+      });
+      return;
+    }
 
-  if (book) {
-    book.title = req.body.title;
-    book.description = req.body.description;
+    // Verify the new author if the request includes an author ID.
+    if (value.author) {
+      const authorExists = await Author.exists({
+        _id: value.author,
+      });
+
+      if (!authorExists) {
+        res.status(404).json({
+          message: "Author not found",
+        });
+        return;
+      }
+    }
+
+    const book = await Book.findByIdAndUpdate(
+      req.params.id,
+      { $set: value },
+      {
+        new: true,
+        runValidators: true,
+      },
+    ).populate("author", "firstName lastName");
+
+    if (!book) {
+      res.status(404).json({
+        message: "Book not found",
+      });
+      return;
+    }
 
     res.status(200).json({
-      message: "book has been updated successfully",
-      updatedBook: book,
+      message: "Book has been updated successfully",
+      book,
     });
-  } else {
-    res.status(404).json({ message: "book not found" });
-  }
-});
+  }),
+);
 
 /**
  * @desc    Delete a book
  * @route   /api/books/:id
- * @method  Delete
+ * @method  DELETE
  * @access  Public
  */
+router.delete(
+  "/:id",
+  expressAsyncHandler(async (req, res) => {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+      res.status(400).json({ message: "Invalid book ID" });
+      return;
+    }
 
-router.delete("/:id", (req, res) => {
-  const bookIndex = books.findIndex((b) => b.id === parseInt(req.params.id));
+    const book = await Book.findByIdAndDelete(req.params.id);
 
-  if (bookIndex === -1) {
-    return res.status(404).json({ message: "book not found" });
-  }
-  const deletedBook = books.splice(bookIndex, 1);
-  res.status(200).json({
-    message: "Book has been deleted succesfully",
-    deletedBook: deletedBook[0],
-  });
-});
+    if (!book) {
+      res.status(404).json({
+        message: "Book not found",
+      });
+      return;
+    }
 
-/**
- * @desc    Validate book request body using Joi
- * @param   {any} body - Request body object
- * @returns Joi validation result
- */
-function validateObject(body: any) {
-  const schema = Joi.object({
-    title: Joi.string().min(3).max(30).required(),
-    description: Joi.string().min(10).max(200),
-  });
+    res.status(200).json({
+      message: "Book has been deleted successfully",
+      deletedBook: book,
+    });
+  }),
+);
 
-  return schema.validate(body);
-}
-/**
- * @desc    Validate updating book request body using Joi
- * @param   {any} body - Request body object
- * @returns Joi validation result
- */
-function validateUpObject(body: any) {
-  const schema = Joi.object({
-    title: Joi.string().min(3).max(30),
-    description: Joi.string().min(10).max(200),
-  });
-
-  return schema.validate(body);
-}
 export default router;
