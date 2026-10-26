@@ -1,14 +1,19 @@
+import "dotenv/config";
+
 import express, { type ErrorRequestHandler } from "express";
 import mongoose from "mongoose";
 
 import bookPath from "./routes/books.ts";
 import authorsRouter from "./routes/authors.ts";
 
-// Start point
+// Application configuration
 const app = express();
 
+const PORT = Number(process.env.PORT ?? 8080);
+const MONGODB_URI = process.env.MONGODB_URI;
+
 // Middleware
-app.use(express.json());
+app.use(express.json()); // convert the raw data/stream data json to js objects for validations/stroe/use ..etc
 
 // Books endpoints
 app.use("/api/books", bookPath);
@@ -29,24 +34,33 @@ const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   });
 };
 
-// Must be registered after all routes
+// Must come after all routes
 app.use(errorHandler);
 
-// Server configuration
-const PORT = 8080;
-
-// Connect to the database, then start the server
+// Start server after connecting to MongoDB
 const startServer = async () => {
+  if (!MONGODB_URI) {
+    console.error("MONGODB_URI is missing from the environment variables.");
+    process.exit(1);
+  }
+
+  if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+    console.error("PORT must be a valid port number.");
+    process.exit(1);
+  }
+
   try {
-    await mongoose.connect("mongodb://localhost/bookStoreDB");
+    await mongoose.connect(MONGODB_URI);
 
     console.log("Connected to DB ...");
 
     app.listen(PORT, () => {
-      console.log(`The server is running on port ${PORT}`);
+      console.log(
+        `The server is running in ${process.env.environment} environment on port ${PORT}`,
+      );
     });
   } catch (error) {
-    console.error("Error connecting to DB:", error);
+    console.error("Failed to start the server:", error);
     process.exit(1);
   }
 };
