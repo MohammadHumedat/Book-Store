@@ -1,46 +1,39 @@
 import "dotenv/config";
 
-import express, { type ErrorRequestHandler } from "express";
+import express from "express";
 import mongoose from "mongoose";
 
 import bookPath from "./routes/books.ts";
 import authorsRouter from "./routes/authors.ts";
+
+import logger from "./middleware/logger.ts";
+import { notFound, errorHandler } from "./middleware/errors.ts";
 
 // Application configuration
 const app = express();
 
 const PORT = Number(process.env.PORT ?? 8080);
 const MONGODB_URI = process.env.MONGODB_URI;
+const NODE_ENV = process.env.NODE_ENV ?? "development";
 
 // Middleware
-app.use(express.json()); // convert the raw data/stream data json to js objects for validations/stroe/use ..etc
+app.use(logger);
+app.use(express.json());
 
-// Books endpoints
+// Routes
 app.use("/api/books", bookPath);
-
-// Authors endpoints
 app.use("/api/auth", authorsRouter);
 
+// Handle unknown routes
+app.use(notFound);
+
 // Centralized Error-Handling Middleware
-const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
-  console.error(err);
-
-  if (res.headersSent) {
-    return next(err);
-  }
-
-  res.status(500).json({
-    message: "Internal server error",
-  });
-};
-
-// Must come after all routes
 app.use(errorHandler);
 
-// Start server after connecting to MongoDB
+// Connect to MongoDB, then start the server
 const startServer = async () => {
   if (!MONGODB_URI) {
-    console.error("MONGODB_URI is missing from the environment variables.");
+    console.error("MONGODB_URI is missing from environment variables.");
     process.exit(1);
   }
 
@@ -56,7 +49,7 @@ const startServer = async () => {
 
     app.listen(PORT, () => {
       console.log(
-        `The server is running in ${process.env.environment} environment on port ${PORT}`,
+        `The server is running in ${NODE_ENV} environment on port ${PORT}`,
       );
     });
   } catch (error) {
