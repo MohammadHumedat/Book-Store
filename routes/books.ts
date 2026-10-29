@@ -42,7 +42,7 @@ router.get(
     const book = await Book.findById(req.params.id).populate(
       "author",
       "firstName lastName",
-    );
+    );  
 
     if (!book) {
       res.status(404).json({ message: "Book not found" });
